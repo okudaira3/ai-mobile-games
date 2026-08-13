@@ -13,7 +13,8 @@ export const games = [
     title: "ネジ抜きパズル",
     eyebrow: "SCREW PUZZLE",
     description: "ネジを順番に外して、仕掛けをほどいていくパズルゲーム。",
-    status: "coming-soon",
+    route: "#/screw-sort",
+    status: "playable",
     accent: "coral",
   },
 ];

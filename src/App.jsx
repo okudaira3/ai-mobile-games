@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { games } from "./data/games";
 import WaterSortLab from "./games/water-sort/WaterSortLab";
+import ScrewSortPuzzle from "./games/screw-sort/ScrewSortPuzzle";
 
 function useHashRoute() {
   const readRoute = () => window.location.hash || "#/";
@@ -59,7 +60,18 @@ function WaterSortPage() {
   );
 }
 
+function ScrewSortPage() {
+  return (
+    <main className="screw-sort-page">
+      <a className="back-link" href="#/" aria-label="ゲーム一覧へ戻る">← ゲーム一覧</a>
+      <ScrewSortPuzzle />
+    </main>
+  );
+}
+
 export default function App() {
   const route = useHashRoute();
-  return route === "#/water-sort" ? <WaterSortPage /> : <GameList />;
+  if (route === "#/water-sort") return <WaterSortPage />;
+  if (route === "#/screw-sort") return <ScrewSortPage />;
+  return <GameList />;
 }
