@@ -9,11 +9,12 @@ export const games = [
     accent: "aqua",
   },
   {
-    id: "suika-like",
-    title: "スイカゲームもどき",
-    eyebrow: "FRUIT PUZZLE",
-    description: "ころころ育てて、大きな実を目指すパズルゲーム。",
-    status: "coming-soon",
+    id: "screw-sort",
+    title: "ネジ抜きパズル",
+    eyebrow: "SCREW PUZZLE",
+    description: "ネジを順番に外して、仕掛けをほどいていくパズルゲーム。",
+    route: "#/screw-sort",
+    status: "playable",
     accent: "coral",
   },
 ];
