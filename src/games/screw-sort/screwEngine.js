@@ -72,14 +72,19 @@ export function stateKey(level, state) {
   const spare = state.spare.map((id) => level.screws.find((s) => s.id === id).color).sort().join('');
   return `${state.removed.slice().sort().join(',')}/${boxes}/${spare}`;
 }
-export function isSolvable(level, limit = 20000) {
+export function findSolution(level, limit = 20000) {
   const seen = new Set(); let nodes = 0;
   function visit(state) {
-    if (state.cleared) return true;
-    if (++nodes > limit) return false;
-    const key = stateKey(level, state); if (seen.has(key)) return false; seen.add(key);
+    if (state.cleared) return [];
+    if (++nodes > limit) return null;
+    const key = stateKey(level, state); if (seen.has(key)) return null; seen.add(key);
     const choices = removableScrews(level, state).sort((a, b) => a.color.localeCompare(b.color));
-    return choices.some((s) => { const result = applyTap(level, state, s.id); return result.accepted && visit(result.state); });
+    for (const screw of choices) {
+      const result = applyTap(level, state, screw.id); if (!result.accepted) continue;
+      const tail = visit(result.state); if (tail) return [screw.id, ...tail];
+    }
+    return null;
   }
   return visit(createInitialState(level));
 }
+export function isSolvable(level, limit = 20000) { return Boolean(findSolution(level, limit)); }

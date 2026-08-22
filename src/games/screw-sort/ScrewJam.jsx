@@ -12,7 +12,10 @@ export default function ScrewJam() {
   useEffect(() => { setState(createInitialState(level)); setHistory([]); setFalling([]); }, [level]);
   useEffect(() => { localStorage.setItem(SAVE_KEY, JSON.stringify({ highest: Math.max(saved.highest, number), current: number })); }, [number, saved.highest]);
   const tap = (screw) => {
-    const result = applyTap(level, state, screw.id); if (result.failed) { if (!muted) tone('fail'); return; } if (!result.accepted) return;
+    const result = applyTap(level, state, screw.id);
+    // The failed state carries gameOver; commit it so the overlay appears instead of silently ignoring the tap.
+    if (result.failed) { setState(result.state); navigator.vibrate?.(60); if (!muted) tone('fail'); return; }
+    if (!result.accepted) return;
     setHistory((old) => [...old.slice(-19), state]); setState(result.state); setFlying(screw); if (result.fallen?.length) { setFalling(result.fallen); setTimeout(() => setFalling([]), 700); } clearTimeout(timer.current); timer.current = setTimeout(() => setFlying(null), 330);
     navigator.vibrate?.(18); if (!muted) tone(result.resolved?.length ? 'clear' : result.fallen?.length ? 'fall' : 'tap');
   };
