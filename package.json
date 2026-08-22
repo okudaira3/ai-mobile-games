@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "validate:screw-stages": "node scripts/validate-screw-stages.mjs",
+    "validate:screw-levels": "node scripts/validate-screw-levels.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

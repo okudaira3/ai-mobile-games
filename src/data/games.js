@@ -12,7 +12,7 @@ export const games = [
     id: "screw-sort",
     title: "ネジ抜きパズル",
     eyebrow: "SCREW PUZZLE",
-    description: "ネジを順番に外して、仕掛けをほどいていくパズルゲーム。",
+    description: "ネジを抜いて板を落とし、隠れた仕掛けをほどくパズルゲーム。",
     route: "#/screw-sort",
     status: "playable",
     accent: "coral",
