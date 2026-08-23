@@ -1,39 +1,34 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { BOX_SIZE, SPARE_CAPACITY, applyTap, createInitialState, isBlocked, remainingScrews } from './screwEngine';
-import { generateLevel } from './levelGenerator';
+import { useEffect, useMemo, useState } from 'react';
+import { applyMove, createInitialState, holeById, isHoleExposed, legalDestinations, removableScrews, screwAtHole, searchFromState, shortestSolution } from './screwEngine';
+import { LEVEL_COUNT, getLevel } from './levelPack';
 import './ScrewJam.css';
 
-const SAVE_KEY = 'screw-jam:v1';
-function loadProgress() { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || { highest: 1, current: 1 }; } catch { return { highest: 1, current: 1 }; } }
-function tone(kind) { try { const C = window.AudioContext || window.webkitAudioContext; const ctx = tone.ctx || (tone.ctx = new C()); const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = kind === 'clear' ? 880 : kind === 'fall' ? 95 : 360; g.gain.setValueAtTime(.07, ctx.currentTime); g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + .13); o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + .14); } catch {} }
+const SAVE_KEY = 'screw-board:v1';
+const load = () => { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || { highest: 1, current: 1 }; } catch { return { highest: 1, current: 1 }; } };
+const colors = ['#f06d73', '#f4c65b', '#63e0c4', '#89b9f5', '#d7a3ef', '#f49ec1'];
+
 export default function ScrewJam() {
-  const saved = useMemo(loadProgress, []); const [number, setNumber] = useState(saved.current); const level = useMemo(() => generateLevel(number), [number]);
-  const [state, setState] = useState(() => createInitialState(level)); const [history, setHistory] = useState([]); const [muted, setMuted] = useState(() => localStorage.getItem('screw-jam:mute') === '1'); const [flying, setFlying] = useState(null); const [falling, setFalling] = useState([]); const timer = useRef();
-  useEffect(() => { setState(createInitialState(level)); setHistory([]); setFalling([]); }, [level]);
-  useEffect(() => { localStorage.setItem(SAVE_KEY, JSON.stringify({ highest: Math.max(saved.highest, number), current: number })); }, [number, saved.highest]);
-  const tap = (screw) => {
-    const result = applyTap(level, state, screw.id);
-    // The failed state carries gameOver; commit it so the overlay appears instead of silently ignoring the tap.
-    if (result.failed) { setState(result.state); navigator.vibrate?.(60); if (!muted) tone('fail'); return; }
-    if (!result.accepted) return;
-    setHistory((old) => [...old.slice(-19), state]); setState(result.state); setFlying(screw); if (result.fallen?.length) { setFalling(result.fallen); setTimeout(() => setFalling([]), 700); } clearTimeout(timer.current); timer.current = setTimeout(() => setFlying(null), 330);
-    navigator.vibrate?.(18); if (!muted) tone(result.resolved?.length ? 'clear' : result.fallen?.length ? 'fall' : 'tap');
-  };
-  const undo = () => { const prior = history.at(-1); if (prior) { setState(prior); setHistory((h) => h.slice(0, -1)); } };
-  const reset = () => { setState(createInitialState(level)); setHistory([]); };
-  const fallen = new Set(state.fallen), visible = remainingScrews(level, state).filter((s) => !isBlocked(level, state, s));
-  return <section className="sj" aria-label="ネジ抜きパズル">
-    <header className="sj-head"><span>LEVEL {number}</span><strong>残り {level.screws.length - state.removed.length}</strong><button onClick={() => { const next = !muted; setMuted(next); localStorage.setItem('screw-jam:mute', next ? '1' : '0'); }} aria-label="サウンド切替">{muted ? '🔇' : '🔊'}</button></header>
-    <div className="sj-board">
-      {level.plates.filter((p) => !fallen.has(p.id)).sort((a,b) => a.z-b.z).map((p) => <div className="sj-plate" key={p.id} style={{ left:`${p.x}%`,top:`${p.y}%`,width:`${p.w}%`,height:`${p.h}%`,transform:`rotate(${p.r}deg)`,background:p.color,zIndex:p.z+1 }} />)}
-      {level.plates.filter((p) => falling.includes(p.id)).map((p) => <div className="sj-plate is-falling" key={`fall-${p.id}`} style={{ left:`${p.x}%`,top:`${p.y}%`,width:`${p.w}%`,height:`${p.h}%`,transform:`rotate(${p.r}deg)`,background:p.color,zIndex:p.z+1 }} />)}
-      {visible.map((s) => <button className="sj-screw" key={s.id} onClick={() => tap(s)} style={{ left:`${s.x}%`, top:`${s.y}%`, '--c':s.color, zIndex:20+s.anchorZ }} aria-label={`${s.color}のネジを抜く`}><i>+</i></button>)}
-      {flying && <span className="sj-fly" style={{ left:`${flying.x}%`,top:`${flying.y}%`, '--c':flying.color }}>+</span>}
+  const saved = useMemo(load, []); const [number, setNumber] = useState(saved.current); const level = useMemo(() => getLevel(number), [number]);
+  const [state, setState] = useState(() => createInitialState(level)); const [history, setHistory] = useState([]); const [selected, setSelected] = useState(null); const [message, setMessage] = useState('ネジを選び、光っている空き穴へ移動してください。'); const [falling, setFalling] = useState([]);
+  useEffect(() => { setState(createInitialState(level)); setHistory([]); setSelected(null); setFalling([]); }, [level]);
+  useEffect(() => { const next = { highest: Math.max(saved.highest, number), current: number }; localStorage.setItem(SAVE_KEY, JSON.stringify(next)); }, [number, saved.highest]);
+  const targets = selected ? legalDestinations(level, state, selected) : [];
+  const move = (from, to) => { const result = applyMove(level, state, from, to); if (!result.accepted) return; setHistory((old) => [...old.slice(-29), state]); setState(result.state); setSelected(null); if (result.fallen.length) { setFalling(result.fallen); setTimeout(() => setFalling([]), 660); } setMessage(result.fallen.length ? '板が落ち、下の穴が現れました。' : 'ネジを移動しました。'); };
+  const select = (hole) => { if (selected === hole) return setSelected(null); const destinations = legalDestinations(level, state, hole); setSelected(hole); setMessage(destinations.length ? '移動先を選んでください。' : 'このネジに移動先はありません。別の手を試してください。'); };
+  const undo = () => { const previous = history.at(-1); if (!previous) return; setState(previous); setHistory((items) => items.slice(0, -1)); setSelected(null); setMessage('1手もどしました。'); };
+  const hint = () => { if (state.cleared) return setMessage('このレベルはクリア済みです。'); const solution = shortestSolution(level, state); if (!solution) return setMessage('この盤面はもう解けません。1手もどすか、やり直してください。'); const [from, to] = solution[0]; setSelected(from); setMessage(`ヒント: 最短だとあと${solution.length}手です。光っている穴へ移動してください。`); if (!legalDestinations(level, state, from).includes(to)) setSelected(null); };
+  const dead = useMemo(() => !state.cleared && !searchFromState(level, state).solution, [level, state]);
+  const fallen = new Set(state.fallen);
+  return <section className="screw-puzzle" aria-label="ネジ抜きパズル"><div className="sp-shell">
+    <header className="sp-head"><div><p className="sp-kicker">SCREW BOARD</p><h1 className="sp-title">LEVEL {number} / {LEVEL_COUNT}</h1></div><div className="sp-stats"><span className="sp-stat">手数<b>{state.moves}</b></span><span className="sp-stat">残り板<b>{level.plates.length - state.fallen.length}</b></span></div></header>
+    <div className="sp-stage"><div className="sp-board">
+      {level.plates.filter((p) => !fallen.has(p.id)).sort((a, b) => a.z - b.z).map((p) => <div className="sp-plate" key={p.id} style={{ left: `${p.x}%`, top: `${p.y}%`, width: `${p.w}%`, height: `${p.h}%`, '--r': `${p.r}deg`, '--plate': p.color, zIndex: p.z + 2 }} />)}
+      {level.plates.filter((p) => falling.includes(p.id)).map((p) => <div className="sp-plate falling" key={`fall-${p.id}`} style={{ left: `${p.x}%`, top: `${p.y}%`, width: `${p.w}%`, height: `${p.h}%`, '--r': `${p.r}deg`, '--plate': p.color, zIndex: p.z + 2 }} />)}
+      {level.holes.filter((h) => !screwAtHole(level, state, h.id) && isHoleExposed(level, state, h)).map((h) => <button key={h.id} className={`sp-hole ${targets.includes(h.id) ? 'available' : ''}`} style={{ left: `${h.x}%`, top: `${h.y}%`, zIndex: 40 }} onClick={() => targets.includes(h.id) && move(selected, h.id)} aria-label="空き穴" />)}
+      {removableScrews(level, state).map((id, index) => { const hole = holeById(level, id); return <button key={id} className={`sp-screw ${selected === id ? 'selected' : ''}`} style={{ left: `${hole.x}%`, top: `${hole.y}%`, '--screw': colors[index % colors.length], zIndex: 50 }} onClick={() => select(id)} aria-label="ネジを選ぶ" />; })}
     </div>
-    <div className={`sj-spare ${state.spare.length === SPARE_CAPACITY - 1 ? 'is-warning' : ''}`}><span>予備トレイ</span>{Array.from({length:SPARE_CAPACITY},(_,i) => { const id=state.spare[i], s=level.screws.find(x=>x.id===id); return <b key={i} style={{background:s?.color}}>{s ? '+' : ''}</b>; })}</div>
-    <div className="sj-holder">{state.boxes.map((box,i)=><div className="sj-box" key={i} style={{'--box':box.color || '#526177'}}>{Array.from({length:BOX_SIZE},(_,j)=>{const id=box.screws[j],s=level.screws.find(x=>x.id===id); return <b key={j} style={{background:s?.color}}>{s?'+':''}</b>;})}</div>)}</div>
-    <div className="sj-actions"><button onClick={undo} disabled={!history.length}>1手もどす</button><button onClick={reset}>やり直す</button><a href="#/">ゲーム一覧へ</a></div>
-    {state.gameOver && <div className="sj-overlay"><div><h2>入れる場所がありません</h2><p>1手もどすか、最初からやり直してください。</p><button onClick={reset}>やり直す</button><button onClick={undo} disabled={!history.length}>1手もどす</button></div></div>}
-    {state.cleared && <div className="sj-overlay"><div><h2>クリア！</h2><p>{state.moves}手でクリアしました。</p><button onClick={() => setNumber((n) => n + 1)}>次のレベルへ</button></div></div>}
-  </section>;
+      <p className="sp-toast">{message}</p><div className="sp-controls"><button className="sp-btn" onClick={undo} disabled={!history.length}>1手もどす</button><button className="sp-btn" onClick={() => { setState(createInitialState(level)); setHistory([]); setSelected(null); }}>やり直す</button><button className="sp-btn" onClick={hint}>ヒント</button></div>
+      {(dead || state.cleared) && <div className="sp-veil"><div className="sp-clear-card"><p className="sp-clear-kicker">{state.cleared ? 'CLEAR' : 'STUCK'}</p><h2 className="sp-clear-title">{state.cleared ? (number === LEVEL_COUNT ? '全レベルクリア' : 'クリアしました') : 'この盤面はもう解けません'}</h2><p className="sp-clear-meta">{state.cleared ? `${state.moves}手でクリアしました。` : '1手もどすか、最初からやり直してください。'}</p><div className="sp-controls">{!state.cleared && <button className="sp-btn" onClick={undo} disabled={!history.length}>1手もどす</button>}<button className="sp-btn" onClick={() => { setState(createInitialState(level)); setHistory([]); }}>やり直す</button>{state.cleared && number < LEVEL_COUNT && <button className="sp-btn primary" onClick={() => setNumber((n) => n + 1)}>次のレベルへ</button>}</div></div></div>}
+    </div><p className="sp-help">板を留めるネジがすべてなくなると板が落ちます。色は見た目だけの違いです。</p>
+  </div></section>;
 }
