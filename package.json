@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "validate:screw-stages": "node scripts/validate-screw-stages.mjs",
-    "preview": "vite preview"
+    "validate:screw-levels": "node scripts/validate-screw-levels.mjs",
+    "preview": "vite preview",
+    "build:screw-levels": "node scripts/build-screw-levels.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

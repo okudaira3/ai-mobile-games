@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { games } from "./data/games";
 import WaterSortLab from "./games/water-sort/WaterSortLab";
-import ScrewSortPuzzle from "./games/screw-sort/ScrewSortPuzzle";
+import ScrewJam from "./games/screw-sort/ScrewJam";
 
 function useHashRoute() {
   const readRoute = () => window.location.hash || "#/";
@@ -64,7 +64,7 @@ function ScrewSortPage() {
   return (
     <main className="screw-sort-page">
       <a className="back-link" href="#/" aria-label="ゲーム一覧へ戻る">← ゲーム一覧</a>
-      <ScrewSortPuzzle />
+      <ScrewJam />
     </main>
   );
 }
