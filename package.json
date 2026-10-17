@@ -14,7 +14,8 @@
     "@vitejs/plugin-react": "latest",
     "vite": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "three": "^0.180.0"
   },
   "devDependencies": {}
-}
+}\n
